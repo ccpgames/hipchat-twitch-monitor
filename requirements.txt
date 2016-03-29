@@ -1,0 +1,2 @@
+hypchat (0.21)
+python-twitch (1.2.0)
