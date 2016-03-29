@@ -1,21 +1,27 @@
 from twitch.api import v3 as twitch
 import sched, time
 from hypchat import HypChat
+import os
 
 activeStreams = {}
 streamMonitor = sched.scheduler(time.time, time.sleep)
 streamMonitorEvent = ""
-token = "NDa4Og8jYHqQV9JzBb1RlCLBfSaGcaHFRkZfkR3s"
-hipChat = HypChat(token, endpoint="https://hipchat.ccpgames.com")
-twitchRoom = hipChat.get_room("CCP Twitch")
+token = os.environ.get("TWITCH_HIPCHAT_TOKEN_V2")
+hipChat = HypChat(token, os.environ.get("TWITCH_HIPCHAT_BASE_URI"))
+twitchRoom = hipChat.get_room(os.environ.get("TWITCH_HIPCHAT_ROOM"))
+gamesList = str(os.environ.get("TWTICH_GAMES")).split(";")
 
 def main():
 
-    updateActiveStreams("EVE: Valkyrie", True)
-    updateActiveStreams("EVE Online", True)
-    while True:
+    monitorRun = True
+
+    twitchRoom.notification("Twitch Monitor has started", "green", "False", "text")
+    for game in gamesList:
+        updateActiveStreams(game, True)
+    while monitorRun:
         streamMonitor.run()
     streamMonitor.empty()
+    twitchRoom.notification("Twitch Monitor has stopped", "red", "False", "text")
 
 
 def updateActiveStreams(gameName, suppressNotifcation=False):
@@ -29,7 +35,9 @@ def updateActiveStreams(gameName, suppressNotifcation=False):
         if stream["channel"]["_id"] not in activeStreams and stream["channel"]["game"] == gameName: #need to do some sanity checking as we've had a few other games sneak in before
             #suppress for first run so we don't spam the channel
             if not suppressNotifcation:
-                twitchRoom.notification("<a href=\"%s\">%s has started streaming %s</a>" % (stream["channel"]["url"], stream["channel"]["display_name"], stream["channel"]["game"]), "purple", "True", "html")
+                twitchRoom.notification("<a href=\"%s\">%s has started streaming %s</a>" %
+                                        (stream["channel"]["url"], stream["channel"]["display_name"], stream["channel"]["game"]),
+                                        "purple", "True", "html")
             updatededStreamList[stream["channel"]["_id"]] = True
             newStream = StreamDetails(stream["channel"]["_id"],
                                       stream["channel"]["display_name"],
@@ -52,13 +60,13 @@ def updateActiveStreams(gameName, suppressNotifcation=False):
         #if a stream is active, reset it's last active time and set it to active
         if stream in ActiveStreamIdList:
             activeStreams[stream].resetLastActive()
-            activeStreams[stream].setActive(True)
+            activeStreams[stream].setActivityState(True)
         #remove a stream from the list of streams if we haven't seen it for more than 600 seconds
         elif (time.time() - activeStreams[stream].getLastActive()) > 600:
             inactiveStreams.append(stream)
         #class a stream as inactive if we haven't seen it for more than 120 seconds but less than 600
         elif (time.time() - activeStreams[stream].getLastActive()) > 120:
-            activeStreams[stream].setActive(False)
+            activeStreams[stream].setActivityState(False)
             updatededStreamList.update({stream: False})
 
     #Now we can remove inactive streams from the list
@@ -80,14 +88,19 @@ def getStreamDetails(streamId):
 class StreamDetails:
 
     def __init__(self, streamId, streamerName, streamName, streamURL, streamGame, isPartner=False):
-        self.streamId, self.streamerName, self.streamName, self.streamURL, self.streamGame, self.isPartner = streamId, streamerName, streamName, streamURL, streamGame, isPartner
+        self.streamId = streamId
+        self.streamerName = streamerName
+        self.streamName = streamName
+        self.streamURL = streamURL
+        self.streamGame = streamGame
+        self.isPartner = isPartner
         self.isActive = True
         self.lastActive = time.time()
 
     def resetLastActive(self):
         self.lastActive = time.time()
 
-    def setActive(self, isActive):
+    def setActivityState(self, isActive):
         self.isActive = isActive
 
     def getLastActive(self):
