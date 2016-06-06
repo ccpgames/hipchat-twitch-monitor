@@ -6,7 +6,7 @@ import sys
 
 from twitch.api import v3 as twitch
 from hypchat import HypChat
-
+from twitch.exceptions import ResourceUnavailableException
 
 token = os.environ.get("TWITCH_HIPCHAT_TOKEN_V2", "")
 twitch_games = os.environ.get("TWITCH_GAMES", "").split(";")
@@ -51,7 +51,12 @@ def update_active_streams(game_name, suppress_notification=False):
     # False if they've gone inactive - will replace with an enum later
     updated_stream_list = {}
 
-    stream_list = twitch.streams.all(game_name)["streams"]
+    try:
+        stream_list = twitch.streams.all(game_name)["streams"]
+    except ResourceUnavailableException as e:
+        logging.warning("Failed to get list of active streams for {}".format(game_name))
+        stream_monitor.enter(15, 2, update_active_streams, (game_name,))
+        return updated_stream_list
 
     # First check to see if there are new streams
     for stream in stream_list:
