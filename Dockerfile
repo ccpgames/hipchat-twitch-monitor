@@ -4,8 +4,8 @@
 FROM python:2.7
 MAINTAINER Ben Gruber <bgruber@ccpgames.com>
 
-ADD /htm/requirements.txt
-ADD /htm/monitor.py
+ADD requirements.txt /htm/
+ADD monitor.py /htm/
 
 RUN pip install -qU virtualenv \
   && virtualenv /venv \
