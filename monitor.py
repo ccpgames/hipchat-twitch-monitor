@@ -3,6 +3,7 @@ import sched
 import time
 import logging
 import sys
+import socket
 
 from twitch.api import v3 as twitch
 from hypchat import HypChat
@@ -27,12 +28,14 @@ if "" in [token, twitch_games, hipchat_uri, hipchat_room]:
 hipchat_connection = HypChat(token, hipchat_uri)
 twitch_room = hipchat_connection.get_room(hipchat_room)
 stream_monitor = sched.scheduler(time.time, time.sleep)
+logging.basicConfig(level=logging.INFO)
 
 active_streams = {}
 
 
 def main():
-    twitch_room.notification("Twitch Monitor has started", "green", "False", "text")
+    twitch_room.notification("Twitch Monitor has started on {}".format(socket.gethostname()), "green", "False", "text")
+    logging.info("Twitch Monitor has started on {}".format(socket.gethostname()))
 
     try:
         for game in twitch_games:
@@ -43,7 +46,9 @@ def main():
         stream_monitor.empty()
 
     finally:
-        twitch_room.notification("Twitch Monitor has stopped", "red", "False", "text")
+        twitch_room.notification("Twitch Monitor has stopped on {}".format(socket.gethostname()),
+                                 "red", "False", "text")
+        logging.info("Twitch Monitor has stopped on {}".format(socket.gethostname()))
 
 
 def update_active_streams(game_name, suppress_notification=False):
@@ -71,6 +76,10 @@ def update_active_streams(game_name, suppress_notification=False):
                     ),
                     "purple", "True", "html"
                 )
+            logging.info("{} has started streaming {}".format(
+                stream["channel"]["display_name"],
+                stream["channel"]["game"]
+            ))
 
             updated_stream_list[stream["channel"]["_id"]] = True
 
@@ -99,6 +108,10 @@ def update_active_streams(game_name, suppress_notification=False):
         # remove a stream from the list of streams if we haven't seen it for more than 600 seconds
         elif (time.time() - active_streams[stream].get_last_active()) > 600:
             inactive_streams.append(stream)
+            logging.info("{} has stopped streaming {}".format(
+                active_streams[stream].streamer_name,
+                active_streams[stream].stream_game
+            ))
         # class a stream as inactive if we haven't seen it for more than 120 seconds but less than 600
         elif (time.time() - active_streams[stream].get_last_active()) > 120:
             active_streams[stream].set_activity_state(False)
